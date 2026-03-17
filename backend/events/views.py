@@ -1,8 +1,10 @@
+from django.core.paginator import Paginator
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 
 from applications.models import Application
+from .models import Event
 from .serializers import EventSerializer
 
 
@@ -44,3 +46,36 @@ def ingest_event(request):
         )
 
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['GET'])
+def list_events(request):
+    events = Event.objects.select_related('application').all()
+
+    application_name = request.GET.get('application')
+    event_type = request.GET.get('event_type')
+    user_id = request.GET.get('user_id')
+
+    if application_name:
+        events = events.filter(application__name=application_name)
+
+    if event_type:
+        events = events.filter(event_type=event_type)
+
+    if user_id:
+        events = events.filter(user_id=user_id)
+
+    paginator = Paginator(events, 5)
+    page_number = request.GET.get('page', 1)
+    page_obj = paginator.get_page(page_number)
+
+    serializer = EventSerializer(page_obj.object_list, many=True)
+
+    return Response({
+        "count": paginator.count,
+        "total_pages": paginator.num_pages,
+        "current_page": page_obj.number,
+        "next_page": page_obj.next_page_number() if page_obj.has_next() else None,
+        "previous_page": page_obj.previous_page_number() if page_obj.has_previous() else None,
+        "results": serializer.data
+    })

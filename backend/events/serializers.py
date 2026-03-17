@@ -3,9 +3,12 @@ from .models import Event
 
 
 class EventSerializer(serializers.ModelSerializer):
+    application = serializers.CharField(source='application.name', read_only=True)
+
     class Meta:
         model = Event
-        fields = ['event_type', 'user_id', 'metadata', 'timestamp']
+        fields = ['id', 'application', 'event_type', 'user_id', 'metadata', 'timestamp', 'created_at']
+        read_only_fields = ['id', 'application', 'created_at']
 
     def validate_event_type(self, value):
         if not value.strip():
