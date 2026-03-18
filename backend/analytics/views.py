@@ -1,20 +1,14 @@
-from django.db.models import Count
-from django.db.models.functions import TruncDate
+from django.db.models import Sum
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 
 from applications.models import Application
 from events.models import Event
+from .models import AggregatedMetric
 
 
-def filter_events_by_application(request):
-    application_name = request.GET.get('application')
-    events = Event.objects.all()
-
-    if application_name:
-        events = events.filter(application__name=application_name)
-
-    return events, application_name
+def get_application_name(request):
+    return request.GET.get('application')
 
 
 @api_view(['GET'])
@@ -27,7 +21,11 @@ def health_check(request):
 
 @api_view(['GET'])
 def analytics_summary(request):
-    events, application_name = filter_events_by_application(request)
+    application_name = get_application_name(request)
+    events = Event.objects.all()
+
+    if application_name:
+        events = events.filter(application__name=application_name)
 
     total_events = events.count()
     total_unique_users = events.values('user_id').distinct().count()
@@ -47,34 +45,43 @@ def analytics_summary(request):
 
 @api_view(['GET'])
 def events_by_type(request):
-    events, application_name = filter_events_by_application(request)
+    application_name = get_application_name(request)
+    metrics = AggregatedMetric.objects.all()
+
+    if application_name:
+        metrics = metrics.filter(application__name=application_name)
 
     data = (
-        events
+        metrics
         .values('event_type')
-        .annotate(count=Count('id'))
+        .annotate(count=Sum('count'))
         .order_by('-count')
     )
 
     return Response({
         "application": application_name,
+        "source": "aggregated_metrics",
         "results": list(data)
     })
 
 
 @api_view(['GET'])
 def events_per_day(request):
-    events, application_name = filter_events_by_application(request)
+    application_name = get_application_name(request)
+    metrics = AggregatedMetric.objects.all()
+
+    if application_name:
+        metrics = metrics.filter(application__name=application_name)
 
     data = (
-        events
-        .annotate(day=TruncDate('timestamp'))
-        .values('day')
-        .annotate(count=Count('id'))
-        .order_by('day')
+        metrics
+        .values('date')
+        .annotate(count=Sum('count'))
+        .order_by('date')
     )
 
     return Response({
         "application": application_name,
+        "source": "aggregated_metrics",
         "results": list(data)
     })
