@@ -2,6 +2,8 @@ from django.core.paginator import Paginator
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
+from .throttles import EventIngestionRateThrottle
+from rest_framework.decorators import api_view, throttle_classes
 
 from applications.models import Application
 from .models import Event
@@ -28,6 +30,7 @@ def get_application_from_api_key(request):
 
 
 @api_view(['POST'])
+@throttle_classes([EventIngestionRateThrottle])
 def ingest_event(request):
     application, error_response = get_application_from_api_key(request)
     if error_response:
